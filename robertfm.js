@@ -1,6 +1,6 @@
-function loadJsFile(filename){
-    var fileref=document.createElement('script');
-    fileref.setAttribute("type","text/javascript");
+function loadJsFile(filename) {
+    var fileref = document.createElement('script');
+    fileref.setAttribute("type", "text/javascript");
     fileref.setAttribute("src", filename);
 }
 
@@ -26,9 +26,52 @@ setTimeout(function() {
     VK.UI.button('login_button');
 }, 1000);
 
+function checkDuration(duration, song) {
+
+}
+
+function songFilter(response, song) {
+    var result = song.match('(.*) - (.*)([0-9]{1,2}:[0-9]{2})');
+    if (result == null) {
+        result = song.match('(.*) - (.*)');
+    }
+
+    var splitter = '';
+    if (song.indexOf(' (') !== -1) {
+        splitter = ' (';
+    } else if (song.indexOf('(') !== -1) {
+        splitter = '(';
+    }
+    if (splitter != '') {
+        duration = song.split(splitter)[1].split(')')[0];
+        if (duration.indexOf(':') !== -1) {
+            song = song.split(splitter)[0];
+        } else {
+            duration = '';
+        }
+    }
+    if (song.indexOf(' - ') !== -1) {
+        splitter = ' - ';
+    } else if (song.indexOf('-') !== -1) {
+        splitter = '-';
+    }
+    if (splitter != '') {
+        for (var i = 1; i < response.length; i++) {
+            var ok = (response[i].artist == song.split(splitter)[0])
+                  && (response[i].title  == song.split(splitter)[1]);
+            if (ok) {
+                console.log(response[i]);
+                return;
+            }
+        }
+    }
+}
+
 function vkFindSongsByName(song) {
     VK.Api.call('audio.search', {q:song}, function(data) {
-        return data.response;
+        if (data.response) {
+            songFilter(data.response, song);
+        }
     });
 }
 
