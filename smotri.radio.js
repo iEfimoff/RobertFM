@@ -76,7 +76,58 @@ function songFilter(response, song) {
     }
     sendMsg(songNotFound);
 }
+// Store playlist items into WebDb on client-side
+var webdb = {};
+webdb.db = null;
 
+webdb.open = function() {
+  var dbSize = 5 * 1024 * 1024; // 5MB
+  webdb.db = openDatabase("jPlaylist", "1.0", "jPlaylist manager", dbSize);
+}
+webdb.onError = function(tx, e) {
+  console.log("webdb.onError: " + e.message);
+}
+webdb.onSuccess = function(tx, r) {
+  console.log("webdb.onSuccess: OK");
+}
+webdb.createTable = function() {
+  var db = webdb.db;
+  db.transaction(function(tx) {
+    tx.executeSql("CREATE TABLE IF NOT EXISTS " +
+                  "playlist(ID INTEGER PRIMARY KEY ASC, user TEXT, song TEXT, url TEXT)", []);
+  });
+}
+webdb.addSong = function(user, song, url) {
+  var db = webdb.db;
+  db.transaction(function(tx){
+    tx.executeSql("INSERT INTO playlist(user, song, url) VALUES (?,?,?)",
+        [user, song, url],
+        webdb.onSuccess,
+        webdb.onError);
+   });
+}
+webdb.getSongs = function(renderFunc) {
+  var db = webdb.db;
+  db.transaction(function(tx) {
+    tx.executeSql("SELECT * FROM playlist", [], renderFunc,
+        webdb.onError);
+  });
+}
+webdb.sql = function(sql) {
+    var db = webdb.db;
+    function renderFunc(tx, rs) { console.log(rs); }
+    db.transaction(function(tx) { tx.executeSql(sql, [], renderFunc, webdb.onError); });
+}
+webdb.deleteSong = function(id) {
+  var db = webdb.db;
+  db.transaction(function(tx){
+    tx.executeSql("DELETE FROM playlist WHERE ID=?", [id],
+        webdb.onSuccess,
+        webdb.onError);
+    });
+}
+
+// Robot commands
 function sendMsg(msg) {
     var warn = $('SpammerWarning');
     if (warn.visible() && spammer_warning_shown) {
@@ -96,29 +147,23 @@ function showQueue(index, song) {
 function getPlaylistSongsCount() {
     return playlist.playlist.length;
 }
-
 function getCurrentSongIndex() {
     return playlist.current;
 }
-
 function getCurrentSong() {
     var item = getSongItemByIndex(getCurrentSongIndex());
     return "*** " + item.title + " *** requestred by " + item.artist + " (now playing)";
 }
-
 function getSongByIndex(idx) {
     var item = getSongItemByIndex(idx);
     return item.title + " (requestred by " + item.artist + ")";
 }
-
 function getSongItemByIndex(idx) {
     return playlist.playlist[idx];
 }
-
 function getNoLastAddedSong() {
     return getPlaylistSongsCount() - getCurrentSongIndex();
 }
-
 function addSongToPlaylist(user, song, url) {
     console.log('addSongToPlaylist(' + user + ', ' + song + ', ' + url + ')');
     if (url != '') {
@@ -129,16 +174,26 @@ function addSongToPlaylist(user, song, url) {
     }
 }
 
+function loadSongs(tx, rs) {
+    for (var i=0; i < rs.rows.length; i++) {
+        renderSong(rs.rows.item(i));
+    }
+}
+function renderSong(row) {
+    playlist.add({title:row.song, artist:row.user, mp3:row.url});
+}
+
 function queueCommand() {
     for (var i = 1; i <= getPlaylistSongsCount() && i <= 3; i++) {
         showQueue(i, getSongByIndex(getCurrentSongIndex() + i));
     }
 }
 
-function addCommand(msg) {
+function addCommand(user, msg) {
     var song = msg.split("/add ")[1].replace('–', '-');
     vkFindSongByName(song, function(url) {
         addSongToPlaylist(user, song, url);
+        webdb.addSong(user, song, url);
     });
 }
 
@@ -152,7 +207,7 @@ function robot(user, msg) {
             case "/queue": queueCommand(); break;
         }
         if (msg.indexOf("/add") !== -1 && msg !== "/help") {
-            addCommand(msg);
+            addCommand(user, msg);
             return;
         }
         if (meassage != '') {
@@ -217,12 +272,21 @@ setTimeout(function() {
         jPlayer: "#jquery_jplayer_1",
         cssSelectorAncestor: "#jp_container_1"
     }, [], {
+        playlistOptions: {
+            enableRemoveControls: true
+        },
         swfPath: "http://jplayer.org/latest/js",
         supplied: "mp3",
         wmode: "window",
         smoothPlayBar: true,
         keyEnabled: true
     });
+
+    // Get Songs from WebDb
+    webdb.open();
+    webdb.createTable();
+    webdb.getSongs(loadSongs);
+
     // Send information about currect song
     jQuery('#jquery_jplayer_1').bind(jQuery.jPlayer.event.loadstart, function(event) { 
         sendMsg(getCurrentSong());
