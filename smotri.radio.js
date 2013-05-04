@@ -1,27 +1,3 @@
-/*
-The MIT License (MIT)
-
-Copyright (c) 2013 mxen
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
-
 function loadJsFile(filename) {
     var fileref = document.createElement('script');
     fileref.setAttribute("type", "text/javascript");
@@ -129,19 +105,6 @@ function addSongToPlaylist(user, song, url) {
     }
 }
 
-function queueCommand() {
-    for (var i = 1; i <= getPlaylistSongsCount() && i <= 3; i++) {
-        showQueue(i, getSongByIndex(getCurrentSongIndex() + i));
-    }
-}
-
-function addCommand(msg) {
-    var song = msg.split("/add ")[1].replace('–', '-');
-    vkFindSongByName(song, function(url) {
-        addSongToPlaylist(user, song, url);
-    });
-}
-
 function robot(user, msg) {
     setTimeout(function() {
         var meassage = '';
@@ -149,10 +112,13 @@ function robot(user, msg) {
             case "/help": meassage = "/add Artist - Title /song /queue /time"; break;
             case "/time": meassage = new Date(); break;
             case "/song": meassage = getCurrentSong(); break;
-            case "/queue": queueCommand(); break;
+            case "/queue": for (var i = 1; i <= getPlaylistSongsCount() && i <= 3; i++) showQueue(i, getSongByIndex(getCurrentSongIndex() + i)); break;
         }
         if (msg.indexOf("/add") !== -1 && msg !== "/help") {
-            addCommand(msg);
+            var song = msg.split("/add ")[1].replace('–', '-');
+            vkFindSongByName(song, function(url) {
+                addSongToPlaylist(user, song, url);
+            });
             return;
         }
         if (meassage != '') {
@@ -161,7 +127,7 @@ function robot(user, msg) {
         }
     }, 2000);
 }
-// Override smotri.com' javascript function for robot injection
+// Override smotri.com' js function for robot injection
 LoadupJSChat.drawChatMessage = function (mess) {
     for (id in mess) {
         robot(mess[id].login, mess[id].text);
@@ -223,7 +189,7 @@ setTimeout(function() {
         smoothPlayBar: true,
         keyEnabled: true
     });
-    // Send information about currect song
+
     jQuery('#jquery_jplayer_1').bind(jQuery.jPlayer.event.loadstart, function(event) { 
         sendMsg(getCurrentSong());
     });
